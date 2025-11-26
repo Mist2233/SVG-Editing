@@ -1,0 +1,6 @@
+[submodule "external/diffvg"]
+	path = external/diffvg
+	url = https://github.com/BachiLi/diffvg.git
+[submodule "external/LIVE"]
+	path = external/LIVE
+	url = https://github.com/ma-xu/LIVE.git
