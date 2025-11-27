@@ -76,3 +76,5 @@ docker run --gpus all -it --rm -v ${PWD}:/workspace diffvg-env
     *   **A:** 确保 Windows 上没有运行其他占用显存的大型程序（如游戏）。DiffVG 需要独占 GPU 进行渲染。
 *   **Q: 找不到 `pydiffvg` 模块？**
     *   **A:** 请确保你在 Docker 容器内运行代码。Windows 本地的 Python 环境并没有安装这个库。
+
+其他配置问题，可以参考issue1: https://github.com/Mist2233/SVG-Editing/issues/1
