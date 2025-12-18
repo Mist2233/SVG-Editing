@@ -41,6 +41,7 @@ docker run --gpus all -it --rm -v ${PWD}:/workspace diffvg-env
 
 在容器内部，你的代码位于 `/workspace` 目录下。
 
+#### 4.1 基础示例
 *   **运行官方 Demo (测试环境):**
     ```bash
     # 官方示例脚本位于容器的临时目录中
@@ -48,14 +49,28 @@ docker run --gpus all -it --rm -v ${PWD}:/workspace diffvg-env
     python painterly_rendering.py /workspace/data/cat.jpg --num_paths 512 --max_width 4.0 --use_lpips_loss
     ```
 
-*   **运行你的脚本 (执行任务):**
-    ```bash
-    # 回到工作区
-    cd /workspace
-    
-    # 运行你自己写的程序
-    python main.py
-    ```
+#### 4.2 LPIPS 矢量化 (Step 1)
+使用 `lpips_pipeline.py` 将位图转换为矢量图，使用 LPIPS 感知损失以获得更好的结构和纹理。
+
+```bash
+# 用法: python lpips_pipeline.py <目标图片路径> [参数]
+# 示例: 将红苹果矢量化 (2048个路径, 500轮迭代)
+python lpips_pipeline.py data/apple_red.jpg --num_paths 2048 --num_iter 500
+```
+*   **输入**: `data/apple_red.jpg`
+*   **输出**: `output/apple_red_2048path_500iter_lpips.svg` (自动命名)
+
+#### 4.3 SVG 拓扑编辑与微调 (Step 2)
+使用 `refine_pipeline.py` 加载现有的 SVG，保持其拓扑结构（Path 数量和顺序）不变，仅微调参数使其拟合另一张目标图片。
+
+```bash
+# 用法: python refine_pipeline.py <源SVG路径> <目标图片路径> [参数]
+# 示例: 将红苹果 SVG 变成 绿苹果 (500轮迭代)
+python refine_pipeline.py output/apple_red_2048path_500iter_lpips.svg data/apple_green.jpg --num_iter 500
+```
+*   **输入**: 源 SVG (`apple_red...svg`) + 目标图片 (`apple_green.jpg`)
+*   **输出**: `output/apple_red..._to_apple_green_500iter_refine.svg` (自动命名)
+*   **用途**: 制作成对的 SVG 数据集 (SVG_A -> SVG_B)，用于训练 SVG 编辑模型。
 
 ### 5. 编写代码 (Coding)
 
