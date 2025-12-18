@@ -72,6 +72,31 @@ python refine_pipeline.py output/apple_red_2048path_500iter_lpips.svg data/apple
 *   **输出**: `output/apple_red..._to_apple_green_500iter_refine.svg` (自动命名)
 *   **用途**: 制作成对的 SVG 数据集 (SVG_A -> SVG_B)，用于训练 SVG 编辑模型。
 
+#### 4.4 动态路径优化 (Advanced)
+通过动态剪枝（Pruning）和生长（Spawning）来优化路径数量和分布，适合处理复杂的拓扑变化。
+
+**A. 动态剪枝 (Dynamic Pruning)**
+移除低透明度或对画面贡献小的路径，精简 SVG。支持加载现有 SVG 进行热启动。
+
+```bash
+# 用法: python dynamic_pruning.py <目标图片> --init_svg <初始SVG> [参数]
+# 示例: 基于红苹果 SVG，生成被咬一口的红苹果 (自动移除被咬掉部分的路径)
+python dynamic_pruning.py data/apple_red_bite.jpg --init_svg output/apple_red_2048path_500iter_lpips.svg --output_name apple_bite_pruning --num_iter 50 --prune_threshold 0.005 --use_mse
+```
+*   `--prune_threshold`: 透明度阈值，低于此值的路径将被删除。
+*   `--use_mse`: 使用 MSE 损失代替 LPIPS，大幅提升速度（适合微调）。
+
+**B. 动态生长 (Dynamic Spawning)**
+在高误差区域自动生成新路径，补充细节（如增加叶子）。
+
+```bash
+# 用法: python dynamic_spawning.py <目标图片> --init_svg <初始SVG> [参数]
+# 示例: 基于红苹果 SVG，生成带叶子的苹果 (自动在叶子区域生长新路径)
+python dynamic_spawning.py data/apple_red_with_leaves.jpg --init_svg output/apple_red_2048path_500iter_lpips.svg --output_name apple_with_leaves --num_iter 50 --spawn_interval 50 --use_mse --max_paths 2200
+```
+*   `--spawn_interval`: 每隔多少轮尝试生长一次。
+*   `--max_paths`: 允许的最大路径数（建议设置得比初始路径数大，以便有空间生长）。
+
 ### 5. 编写代码 (Coding)
 
 *   **编辑器:** 直接在 Windows 上使用 **VS Code** 打开 `E:\Development\SVG-Editing` 文件夹。
