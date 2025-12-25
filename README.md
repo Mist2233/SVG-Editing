@@ -130,4 +130,28 @@ python dynamic_spawning.py data/apple_red_with_leaves.jpg --init_svg output/appl
         python batch_lineart_thicken.py --only 3 4
         ```
 
-### 6. 编写代码 (Coding)
+### 6. 拓扑编辑 (Topology Editing: Add & Remove)
+
+针对需要增加、删除或修改图像内容（改变拓扑结构）的任务，使用 `batch_topology_edit.py` 脚本。
+
+#### 6.1 适用场景
+*   **Remove (删除)**: 移除图像中多余的物体（如 Case 1, 2）。
+*   **Add (增加)**: 在图像中增加新的物体或细节（如 Case 4, 5）。
+*   **Modify (修改)**: 替换图像中的物体（先删后增，如 Case 3）。
+
+#### 6.2 自动流程
+脚本会自动根据文件夹编号执行相应的逻辑：
+*   **Folder 1, 2**: 执行 `Dynamic Pruning`（剪枝），移除与目标不符的路径。
+*   **Folder 4, 5**: 执行 `Dynamic Spawning`（生长），在误差大的区域生成新路径。
+*   **Folder 3**: 混合模式，先执行剪枝移除旧内容，再执行生长添加新内容。
+
+#### 6.3 用法
+```bash
+# 在项目根目录运行
+python batch_topology_edit.py
+
+# 或者只运行特定文件夹
+python batch_topology_edit.py --only 3 4
+```
+
+### 7. 编写代码 (Coding)
