@@ -16,6 +16,11 @@
 E:\Development\SVG-Editing\   <-- 项目根目录
 ├── data\                     # 存放输入图片 (e.g., input.jpg)
 ├── output\                   # 存放生成的 SVG/PNG 结果
+├── color_scripts\            # [New] 核心颜色优化脚本
+│   ├── batch_color_refine_smart.py   # 用于有边框的图像
+│   └── batch_lineart_thicken.py      # 用于无边框/清洗后的线稿
+├── _archive\                 # [New] 归档的旧版本脚本
+├── ref_docs\                 # [New] AI生成的开发文档和问题日志
 ├── main.py                   # 你的主程序代码
 ├── Dockerfile                # 环境构建文件
 └── README.md                 # 说明文档
@@ -97,24 +102,32 @@ python dynamic_spawning.py data/apple_red_with_leaves.jpg --init_svg output/appl
 *   `--spawn_interval`: 每隔多少轮尝试生长一次。
 *   `--max_paths`: 允许的最大路径数（建议设置得比初始路径数大，以便有空间生长）。
 
-### 5. 编写代码 (Coding)
+### 5. 颜色与线稿优化 (New Workflow)
 
-*   **编辑器:** 直接在 Windows 上使用 **VS Code** 打开 `E:\Development\SVG-Editing` 文件夹。
-*   **编辑:** 在 VS Code 中编写/修改代码，保存文件 (`Ctrl+S`)。
-*   **生效:** 由于使用了挂载 (`-v`)，你修改的代码会**实时同步**到 Docker 容器中，无需重启容器，直接在容器终端再次运行 `python main.py` 即可生效。
+针对成对数据（Lineart -> Color）的专用优化脚本，现已整理至 `color_scripts/` 目录。
 
-### 6. 查看结果 (Check Results)
+#### 5.1 目录说明
+*   **`color_scripts/`**: 存放当前正在使用的、验证有效的生产脚本。
+*   **`_archive/`**: 存放所有历史版本、实验性或已废弃的脚本（如 v2, v3, solid 等）。
+*   **`ref_docs/`**: 存放开发过程中的技术文档、问题排查日志和原理说明。
 
-程序生成的输出文件（如 `output/result.svg`）会保存在 Windows 的 `output` 文件夹中。
-你可以直接在 Windows 上双击打开 SVG 文件查看效果。
+#### 5.2 核心脚本使用
+1.  **`batch_color_refine_smart.py`**
+    *   **适用场景**: **有边框**的原始 SVG 图像。
+    *   **特点**: 智能处理透明度，能够很好地保持原有边框的结构，同时优化填充颜色。
+    *   **用法**:
+        ```bash
+        cd color_scripts
+        python batch_color_refine_smart.py --only 1 2
+        ```
 
-### ⚡ 常见问题 (FAQ)
+2.  **`batch_lineart_thicken.py`**
+    *   **适用场景**: **无边框** 或 **经过 `clean_svg.py` 清洗后** 的 SVG 图像。
+    *   **特点**: 包含“战术性加粗”策略，防止细线在优化过程中消失；强制不透明度为 1.0，确保颜色鲜艳且覆盖完整。
+    *   **用法**:
+        ```bash
+        cd color_scripts
+        python batch_lineart_thicken.py --only 3 4
+        ```
 
-*   **Q: 报错 `RuntimeError: Numpy is not available`?**
-    *   **A:** 容器内的 NumPy 版本过高。在容器内运行 `pip install "numpy<2.0"` 即可解决。
-*   **Q: 运行速度慢？**
-    *   **A:** 确保 Windows 上没有运行其他占用显存的大型程序（如游戏）。DiffVG 需要独占 GPU 进行渲染。
-*   **Q: 找不到 `pydiffvg` 模块？**
-    *   **A:** 请确保你在 Docker 容器内运行代码。Windows 本地的 Python 环境并没有安装这个库。
-
-其他配置问题，可以参考issue1: https://github.com/Mist2233/SVG-Editing/issues/1
+### 6. 编写代码 (Coding)
