@@ -1,0 +1,189 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Project Report Template
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx} % For images
+\usepackage{geometry} % For margins
+\geometry{a4paper, margin=1in}
+\usepackage{float}    % For tables and other floats
+\usepackage{amsmath}  % For math
+\usepackage{amssymb}  % For more math
+\usepackage{listings} % For source code
+\usepackage{subfig}   % For subfigures
+\usepackage[usenames,dvipsnames]{color} % For colors and names
+\usepackage{hyperref}           % For hyperlinks and indexing the PDF
+\usepackage{setspace} % For line spacing
+
+\hypersetup{
+    colorlinks,
+    citecolor=blue,
+    filecolor=blue,
+    linkcolor=blue,
+    urlcolor=blue
+}
+
+\definecolor{mygrey}{gray}{.96} % Light Grey
+\lstset{
+	language=Python,
+    tabsize=4,
+	basicstyle=\footnotesize\ttfamily,
+	numbers=left,
+	numberstyle=\tiny,
+	stepnumber=1,
+	numbersep=5pt,
+	backgroundcolor=\color{mygrey},
+	frame=single,
+	captionpos=b,
+	breaklines=true,
+	breakatwhitespace=false,
+	commentstyle=\color{BrickRed},
+    keywordstyle=\color{Blue},
+    stringstyle=\color{OliveGreen}
+}
+
+\begin{document}
+
+% TITLE PAGE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    
+    \Huge \textbf{Image Vectorization Editing and Optimization via Differentiable Rendering}
+    
+    \vspace{1.5cm}
+    
+    \Large \textbf{CS4316}
+    
+    \vspace{0.5cm}
+    
+    \large Shanghai Jiao Tong University
+    
+    \vspace{2cm}
+    
+    \textbf{Tianyu Mao} \\
+    523030910086
+    
+    \vspace{2cm}
+    
+    \begin{abstract}
+        \normalsize
+        \noindent
+        This project explores the domain of vector graphics generation and editing, addressing the scarcity of high-quality training data for downstream AI models. Leveraging Differentiable Vector Graphics (DiffVG), we establish an automated pipeline that transforms raster images into editable Scalable Vector Graphics (SVG). Our work overcomes critical limitations in existing methods, specifically the "masking occlusion" problem and the "over-pruning" of delicate structures. We introduce \textit{Smart Alpha} for dynamic transparency optimization and a multi-metric \textit{Smart Pruning} mechanism that combines color consistency, geometric compactness, and leave-one-out loss analysis. Experimental results demonstrate that our system achieves superior perceptual fidelity and topological cleanliness compared to baseline optimization methods, effectively handling complex tasks such as style transfer and precise object deletion.
+    \end{abstract}
+    
+    \vfill
+    
+    \large \today
+    
+\end{titlepage}
+% END TITLE PAGE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\tableofcontents
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Background and Motivation}
+In the rapidly evolving field of AI-Generated Content (AIGC), raster image generation has reached unprecedented levels of quality. However, vector graphics (SVG) generation remains a significant bottleneck. Unlike raster images, which are grids of pixels, SVGs are composed of mathematical paths defined by control points, making them resolution-independent and easily editable. These properties make SVGs indispensable in graphic design, engineering, and typography.
+
+The primary challenge in learning-based SVG generation is the lack of large-scale, high-quality datasets containing paired "source SVG" and "edited SVG" examples. To address this, we aim to build a robust pipeline that can automatically generate such data by optimizing an input SVG to match a target raster image.
+
+\subsection{Objective}
+The objective of this project is to bridge the gap between pixel-based reference images and vector-based SVG representations. We focus on two core editing tasks:
+\begin{enumerate}
+    \item \textbf{Color Migration (Basic Task):} Transferring the color scheme of a reference image to a source SVG while strictly preserving its original topological structure.
+    \item \textbf{Topology Editing (Advanced Task):} Modifying the SVG structure (adding or removing elements) to match the semantic content of the reference image.
+\end{enumerate}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Methodology}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Our approach is grounded in \textbf{DiffVG (Differentiable Vector Graphics)}, a differentiable rendering engine. Let $P$ be the set of SVG parameters (control points, colors, opacity). The renderer $R$ maps these parameters to a raster image $I = R(P)$. The goal is to find optimal parameters $P^*$ that minimize the difference between the rendered image and the target image $I_{target}$:
+\begin{equation}
+    P^* = \arg\min_P \mathcal{L}(R(P), I_{target})
+\end{equation}
+where $\mathcal{L}$ is a loss function.
+
+\subsection{System Architecture}
+We established a Dockerized environment to ensure reproducibility, resolving dependencies between PyTorch, DiffVG, and CUDA. The pipeline consists of three stages: Preprocessing, Color Optimization, and Topology Pruning.
+
+\subsection{Data Preprocessing: The "Clean + Thicken" Strategy}
+Raw SVGs from the wild are often ill-conditioned for optimization. We implemented `clean\_svg.py` to normalize the data:
+\begin{itemize}
+    \item \textbf{Coordinate Absolute-ization:} Relative coordinates (`m` commands) accumulate errors during gradient updates. We convert all paths to absolute coordinates (`M` commands).
+    \item \textbf{Compound Path Explosion:} Complex paths containing multiple sub-paths are "exploded" into individual elements. This allows the optimizer to assign different colors or opacity values to disjoint parts of the same object.
+    \item \textbf{Tactical Thickening:} Thin strokes often vanish because the gradient for "deleting" a misaligned line is often steeper than "moving" it. We pre-thicken strokes to increase their overlap with the target, creating a larger "gradient basin" for successful convergence.
+\end{itemize}
+
+\subsection{Color Refinement: Smart Alpha}
+A major issue identified in early experiments was the "masking effect," where opaque layers obscured underlying details. Standard SVG optimization often locks opacity ($\alpha$) to 1.0. 
+
+We proposed the \textbf{Smart Alpha} strategy, treating $\alpha$ as a learnable parameter constrained to $[0, 1]$.
+\begin{equation}
+    C_{rendered} = \alpha \cdot C_{foreground} + (1-\alpha) \cdot C_{background}
+\end{equation}
+By optimizing $\alpha$, the system automatically identifies occluding layers that contribute to high loss and reduces their opacity, effectively "fading them out" to reveal the correct structure.
+
+\subsection{Topology Editing: Smart Pruning}
+For the task of removing unwanted elements (e.g., removing a fish's mouth while keeping the eyes), naive loss-based pruning often fails, leading to "over-pruning" (removing useful details like eyes or fins).
+
+We developed a multi-metric scoring system $S(path)$ to determine if a path should be pruned:
+\begin{equation}
+    S(path) = w_1 \cdot S_{color} + w_2 \cdot S_{geo} + w_3 \cdot S_{loss}
+\end{equation}
+
+\begin{itemize}
+    \item \textbf{Color Consistency ($S_{color}$):} We sample points along the path and compare their color in the rendered image vs. the target image. High discrepancy implies the path does not belong.
+    \item \textbf{Geometric Compactness ($S_{geo}$):} Defined as the isoperimetric quotient $\frac{4\pi \cdot Area}{Perimeter^2}$. Regular shapes (like eyes) receive high scores and are protected.
+    \item \textbf{Leave-One-Out Loss ($S_{loss}$):} We tentatively hide the path and measure $\Delta Loss$. If $Loss_{new} < Loss_{old}$, the path is harmful and should be removed.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Experiments and Results}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Implementation Details}
+All experiments were conducted on an NVIDIA GPU with CUDA acceleration. The optimization ran for 200 iterations using the Adam optimizer with a learning rate of 1.0 for positions and 0.01 for colors.
+
+\subsection{Qualitative Evaluation}
+We evaluated our pipeline on the provided test cases. Figure \ref{fig:results} (placeholder) illustrates the progression from the source SVG to the final optimized result.
+\begin{itemize}
+    \item \textbf{Case 1 (Pen):} Successfully transferred the solid blue color while maintaining the outline.
+    \item \textbf{Case 3 (Bulb):} The "Clean + Thicken" strategy successfully reconstructed the filament structure which was previously lost.
+    \item \textbf{Case 2 (Fish):} The Smart Pruning mechanism precisely removed the mouth (black shape) while retaining the eyes and fins, which were lost in baseline approaches.
+\end{itemize}
+
+% Placeholder for result images
+\begin{figure}[H]
+  \centering
+  % \includegraphics[width=0.9\textwidth]{results.png}
+  \caption{Qualitative results. Top: Original SVGs. Middle: Target PNGs. Bottom: Our Optimized Results.}
+  \label{fig:results}
+\end{figure}
+
+\subsection{Loss Function Analysis: MSE vs. LPIPS}
+We explored the trade-off between Mean Squared Error (MSE) and Learned Perceptual Image Patch Similarity (LPIPS).
+\begin{itemize}
+    \item \textbf{MSE:} Tends to prioritize large regions of flat color. This often results in accurate fill colors but washed-out strokes, as strokes occupy few pixels.
+    \item \textbf{LPIPS:} Focuses on structural similarity and high-frequency details. Using LPIPS improved stroke retention but occasionally introduced color noise in flat regions.
+\end{itemize}
+We conclude that a hybrid loss $\mathcal{L} = \lambda_{MSE}\mathcal{L}_{MSE} + \lambda_{LPIPS}\mathcal{L}_{LPIPS}$ is optimal.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Discussion and Limitations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{The Mosaic Effect}
+In the "Spawning" task (adding new objects), we observed a "Mosaic Effect," where the system generates multiple small, fragmented shapes instead of a single coherent object. This is a fundamental limitation of gradient-descent-based vectorization: the optimizer lacks semantic understanding of "objects." It greedily places primitives to cover error regions, resulting in a patch-work appearance.
+
+\subsection{Future Work}
+To address the Mosaic Effect, we propose integrating \textbf{Semantic Priors}. By using a segmentation model (e.g., Segment Anything Model, SAM) to generate an initial mask for the new object, we can initialize the SVG with a coherent shape matching that mask, rather than starting from random initialization.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Conclusion}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+This project successfully demonstrates a differentiable rendering pipeline for SVG editing. Through the introduction of Smart Alpha and Smart Pruning, we resolved key artifacts associated with standard optimization methods. Our system can generate high-quality, topologically clean vector graphics that align with raster targets, providing a valuable tool for automated dataset creation in the field of vector graphics generation.
+
+\end{document}
