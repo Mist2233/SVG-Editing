@@ -4,3 +4,9 @@ __pycache__/
 envs/
 *.pth
 .vscode/
+
+*.aux
+*.log
+*.out
+*.gz
+*.toc
